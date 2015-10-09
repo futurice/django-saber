@@ -1,0 +1,15 @@
+sudo: false
+language: python
+env:
+  - DJANGO=1.8
+python:
+  - 2.7
+  - 3.4
+script: python setup.py test
+notifications:
+  email:
+    - jussi.vaihia@futurice.com
+install:
+  - pip install Django==$DJANGO --use-mirrors
+  - pip install six
+  - pip install cachetools
