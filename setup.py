@@ -24,7 +24,7 @@ base_dir = os.path.dirname(os.path.abspath(__file__))
 
 setup(
     name = "django-saber",
-    version = "0.6",
+    version = "0.6.1",
     description = "Saber provides an in-memory replacement for the Django-ORM",
     url = "http://github.com/futurice/django-saber",
     author = "Jussi Vaihia",

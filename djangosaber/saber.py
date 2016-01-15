@@ -4,7 +4,7 @@ import operator
 import cachetools
 from cachetools import LRUCache, cachedmethod
 
-from djangosaber.cache import DictCachedMixin
+from djangosaber.cache.threaded import DictCachedMixin
 
 class Memory(object):
     def __init__(self, controllers=[]):
