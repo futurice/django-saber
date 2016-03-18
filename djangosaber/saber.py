@@ -1,19 +1,27 @@
 from django.apps import apps
 
+from collections import defaultdict
 import operator
-import cachetools
-from cachetools import LRUCache, cachedmethod
+import six
 
-from djangosaber.cache.threaded import DictCachedMixin
+import os, logging, datetime
+# logging.basicConfig(level=logging.DEBUG)
+
+def key(table, id='', relation=''):
+    # logging.debug("key: {} {} {}".format(table, id, relation))
+    return '.'.join([table, id, relation]).rstrip('.')
 
 class Memory(object):
     def __init__(self, controllers=[]):
         self._controllers = controllers
 
-    def initialize(self, data=None):
+    def initialize(self, data=None, exclude=[]):
         self.classes = self.model_classes()
         self.fields = self.model_fields()
-        self.data = data or self.populate()
+        self.data = data or self.populate(exclude=exclude)
+        self.index = defaultdict(dict)
+        self.creating_index = False
+        self.is_indexed = False
         Traverse._memory = self
         Iterse._memory = self
 
@@ -21,11 +29,51 @@ class Memory(object):
         cls = self.model_classes()[model._meta.model_name]
         return Iterse([cls(k, name=model._meta.model_name, model=cls) for k in data], model)
 
-    def populate(self):
+    def populate(self, exclude=[]):
         r = {}
         for model in apps.get_models():
+            if model._meta.model_name in exclude:
+                continue
             r[model._meta.model_name] = self.fmt(model, model.objects.all().values())
         return r
+
+    def create_index(self, tbl, field_name, relation):
+        self.creating_index = True
+
+        for k, v in enumerate(self.data[tbl]):
+            pk = getattr(v, 'id')
+            self.index.setdefault(key(tbl, str(pk)), k)
+            rel_ids = []
+
+            try:
+                rel_data = getattr(v, relation, getattr(v, field_name))
+            except KeyError as e:
+                #logging.debug("Could not find relation: %s => %s"%(key(tbl,relation), e))
+                continue
+
+            if rel_data:
+                if isinstance(rel_data, dict):
+                    rel_data = [rel_data]
+                rel_ids = map(operator.attrgetter('id'), rel_data)
+            self.index[key(tbl, str(pk), relation)] = rel_ids
+        self.creating_index = False
+
+    def create_indexes(self, exclude=[]):
+        """
+        Create an index for data-lookups, stored as a map of keys to values.
+        - direct lookups store the list index value
+        - related lookups give the database ID
+        """
+        for name, fields in six.iteritems(self.fields):
+            if name in exclude:
+                continue
+            # TODO: table index .get(pk=x) lookup
+            self.index.setdefault(name, {})
+            # relation indexes
+            for field_name, data in six.iteritems(fields):
+                if data['tbl']:
+                    self.create_index(name, field_name, data['tbl'])
+        self.is_indexed = True
     
     def model_fields(self):
         r = {}
@@ -59,6 +107,9 @@ class Memory(object):
 class OrmMixin(object):
     _memory = None
 
+    def objects(self):
+        return self
+
     def all(self):
         return self
 
@@ -85,10 +136,7 @@ class Iterse(OrmMixin, list):
     def __hash__(self):
         return id(self)
 
-def pred(rel_id, id):
-    return lambda x: x[rel_id]==id
-
-class Traverse(DictCachedMixin, OrmMixin, dict):
+class Traverse(OrmMixin, dict):
 
     def __init__(self, data, name=None, model=None):
         super(Traverse, self).__init__(data)
@@ -104,27 +152,38 @@ class Traverse(DictCachedMixin, OrmMixin, dict):
         alias = self._memory.fields[tbl].get(key)
         return alias['tbl'] if alias else key
 
-    @cachedmethod(operator.attrgetter('_cache'))
-    def lookup(self, key, rel_id, id):
-        return list(filter(pred(rel_id, id), self._memory.data[key]))
+    def rel_alias_reverse(self, tbl, key):
+        #logging.debug("rel_alias_reverse: %s, %s"%(tbl,key))
+        for fieldname, v in six.iteritems(self._memory.fields[tbl]):
+            if v['tbl'] == key:
+                return v['rel_id'] if v['rel_id'] else fieldname
+        raise Exception("Unknown reverse alias")
 
-    # 10-35% performance penalty with this method in place to support dict-lookups for DRF
-    def __getitem__(self, key):
-        try:
-            return dict.__getitem__(self, key)
-        except KeyError:
-            if '%s_id'%key in self:
-                return self.get_relation(key)
-            raise
+    def lookup(self, key, rel_id, id):
+        #logging.debug("lookup: %s, %s, %s"%(key,rel_id,id))
+        if not self._memory.is_indexed:
+            return [k for k in self._memory.data[key] if k[rel_id] == id]
+        else:
+            return self.index_lookup(key, id, rel_id)
 
     def get_many_relation(self, key):
+        #logging.debug("get_many_relation: %s"%key)
+        orig_key = key
         key = self.rel_alias(self._name, key)
         key = key.replace('_set', '')
         my_id = self['id']
-        rel_id = '%s_id'%self._name
-        return Iterse(self.lookup(key, rel_id, my_id))
+        if '_set' in orig_key:
+            # TODO: this is a get_reverse_relation
+            rel_id = '%s'%self._name
+            vals = self.lookup(rel_id, key, my_id)
+        else:
+            rel_id = '%s_id'%self.rel_alias_reverse(key, self._name)
+            vals = self.lookup(key, rel_id, my_id)
+
+        return Iterse(vals)
 
     def get_relation(self, key):
+        #logging.debug("get_relation: %s"%key)
         x_id = '%s_id'%key
         key = self.rel_alias(self._name, key)
         value = self[x_id]
@@ -136,17 +195,34 @@ class Traverse(DictCachedMixin, OrmMixin, dict):
     def get_reverse_relation(self, key):
         rel_key = self._memory.fields[self._name][key]['tbl']
         rel_id = self._memory.fields[self._name][key]['rel_id']
-        my_id = self['id']
-        return Iterse(filter(lambda x: x[rel_id]==my_id, self._memory.data[rel_key]))
+        id = self['id']
+
+        if not self._memory.is_indexed:
+            return Iterse([k for k in self._memory.data[rel_key] if k[rel_id] == id])
+        else:
+            return self.index_lookup(self._name, id, rel_key)
+
+    def index_lookup(self, tbl, id, rel_key):
+        #logging.debug("index.lookup: %s, %s, %s"%(tbl,id,rel_key))
+        rel_key_orig = rel_key
+        if rel_key in ['id','pk']:
+            rel_id = self._memory.index.get(key(tbl, str(id)))
+            return self._memory.data[tbl][rel_id]
+        rel_ids = self._memory.index.get(key(tbl, str(id), rel_key), [])
+        #logging.debug("rel_ids: %s"%rel_ids)
+        indexes = [self._memory.index[key(rel_key, str(k))] for k in rel_ids]
+        return Iterse(self._memory.data[rel_key][k] for k in indexes)
 
     def __getattr__(self, key):
+        #logging.debug("__getattr__: %s, %s"%(self._name, key))
         if '_set' in key:
             return self.get_many_relation(key)
         if '%s_id'%key in self:
             return self.get_relation(key)
         try:
             return self[key]
-        except KeyError:
+        except KeyError as e:
             if key in self._memory.fields.get(self._name, {}):
                 return self.get_reverse_relation(key)
             raise AttributeError("'%s' object has no attribute '%s'" % (self.__class__.__name__, key))
+
