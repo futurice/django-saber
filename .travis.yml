@@ -2,6 +2,7 @@ sudo: false
 language: python
 env:
   - DJANGO=1.8
+  - DJANGO=1.9
 python:
   - 2.7
   - 3.4

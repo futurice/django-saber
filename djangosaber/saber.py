@@ -5,10 +5,10 @@ import operator
 import six
 
 import os, logging, datetime
-# logging.basicConfig(level=logging.DEBUG)
+#logging.basicConfig(level=#logging.DEBUG)
 
 def key(table, id='', relation=''):
-    # logging.debug("key: {} {} {}".format(table, id, relation))
+    # #logging.debug("key: {} {} {}".format(table, id, relation))
     return '.'.join([table, id, relation]).rstrip('.')
 
 class Memory(object):
@@ -54,7 +54,7 @@ class Memory(object):
             if rel_data:
                 if isinstance(rel_data, dict):
                     rel_data = [rel_data]
-                rel_ids = map(operator.attrgetter('id'), rel_data)
+                rel_ids = list(map(operator.attrgetter('id'), rel_data))
             self.index[key(tbl, str(pk), relation)] = rel_ids
         self.creating_index = False
 
@@ -124,8 +124,8 @@ class OrmMixin(object):
         keys = list(args) or self._memory.fields[self._name].values().keys()
         flat = kwargs.get('flat', False)
         if flat:
-            return map(lambda x: getattr(x, keys[0]), self)
-        return map(lambda x: {k:getattr(x, k) for k in keys}, self)
+            return list(map(lambda x: getattr(x, keys[0]), self))
+        return list(map(lambda x: {k:getattr(x, k) for k in keys}, self))
 
 class Iterse(OrmMixin, list):
 
