@@ -7,7 +7,7 @@ from django.utils.timezone import now
 from django.core.urlresolvers import reverse
 
 from .models import Ace, Hearts, Player
-from djangosaber.saber import Memory, Traverse
+from djangosaber.saber import Memory, Traverse, key
 
 class BaseSuite(TransactionTestCase):
     pass
@@ -28,9 +28,9 @@ class SaberTest(BaseSuite):
         player1,_ = Player.objects.get_or_create(name='Bob')
         player2,_ = Player.objects.get_or_create(name='Jane')
 
-        ace1,_ = Ace.objects.get_or_create(name='A1', player=player1)
-        ace2,_ = Ace.objects.get_or_create(name='A2', player=player1)
-        ace3,_ = Ace.objects.get_or_create(name='A3', player=player2)
+        ace1,_ = Ace.objects.get_or_create(name='A1', pla_yer=player1)
+        ace2,_ = Ace.objects.get_or_create(name='A2', pla_yer=player1)
+        ace3,_ = Ace.objects.get_or_create(name='A3', pla_yer=player2)
         h1,_ = Hearts.objects.get_or_create(name='H1', player=player2)
         h2,_ = Hearts.objects.get_or_create(name='H2', player=player2)
 
@@ -48,9 +48,56 @@ class SaberTest(BaseSuite):
 
     def test_relation(self):
         player1,_ = Player.objects.get_or_create(name='Bob')
-        ace1,_ = Ace.objects.get_or_create(name='A1', player=player1)
+        ace1,_ = Ace.objects.get_or_create(name='A1', pla_yer=player1)
 
         memory = Memory(controllers=['test_project.controllers'])
         memory.initialize()
         world = Traverse(memory.data)
-        self.assertEqual(world.ace[0].player.name, 'Bob')
+        self.assertEqual(world.ace[0].pla_yer.name, 'Bob')
+
+    def test_index_creation(self):
+        player1,_ = Player.objects.get_or_create(name='Bob')
+        player2,_ = Player.objects.get_or_create(name='Jane')
+
+        ace1,_ = Ace.objects.get_or_create(name='A1', pla_yer=player1)
+        ace2,_ = Ace.objects.get_or_create(name='A2', pla_yer=player1)
+        ace3,_ = Ace.objects.get_or_create(name='A3', pla_yer=player2)
+        h1,_ = Hearts.objects.get_or_create(name='H1', player=player2)
+        h2,_ = Hearts.objects.get_or_create(name='H2', player=player2)
+
+        exclude=['contenttype', 'group', 'permission',]
+        mem = Memory(controllers=['test_project.controllers'])
+        mem.initialize(exclude=exclude)
+        mem.create_indexes(exclude=exclude)
+
+        db = Traverse(mem.data)
+        p = db.player[0]
+
+        self.assertEquals(key('player', str(p.id)), 'player.%s'%p.id)
+        self.assertEquals([k.id for k in p.ace], [ace1.pk, ace2.pk])
+
+        #  map(operator.attrgetter('id') => aget('id')
+        self.assertEquals([k.id for k in db.index_lookup('player', p.id, 'ace')],
+                          [ace1.pk, ace2.pk])
+
+        # reverse FK
+        from pprint import pprint as pp
+        self.assertTrue(isinstance(db.hearts[0].player, dict))
+        self.assertEquals(db.hearts[0].player.id, player2.pk)
+
+        self.assertEquals(db.ace[0].pla_yer.id, player1.id)
+
+        self.assertEquals(
+                len(db.player[0].ace),
+                len(player1.ace_set.all()))
+
+        self.assertEquals(
+                len(db.player[0].ace_set),
+                len([ace1.pk, ace2.pk]))
+
+        self.assertEquals(
+                len(db.player[0].ace_set.all()),
+                len([ace1.pk, ace2.pk]))
+
+        self.assertEquals(db.player[0].ace_set[0].id, ace1.pk)
+

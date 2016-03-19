@@ -24,7 +24,7 @@ class Player(BaseModel, controllers.PlayerController):
     pass
 
 class Ace(Cards, controllers.AceController):
-    player = models.ForeignKey(Player)
+    pla_yer = models.ForeignKey(Player)
 
 class Hearts(Cards, controllers.HeartsController):
     broken = models.BooleanField(default=False)

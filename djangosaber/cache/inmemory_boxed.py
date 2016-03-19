@@ -32,6 +32,17 @@ def set_cache(key, value, time):
 
     CACHED.setdefault(bucket(time), {})[key] = value
 
+
+def cachedfn(f, time=120):
+    def _(*args, **kwargs):
+        key = hashlib.sha256('%s%s%s' % (f.__name__, str(args), str(kwargs))).hexdigest()
+        value = get_cache(key, time)
+        if value is None:
+            value = f(*args, **kwargs)
+            set_cache(key, value, time)
+        return value
+    return _
+
 def cached(time=120):
     """ Write and read to a timed-bucket. """
     def decorator(function):
