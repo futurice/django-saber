@@ -6,7 +6,7 @@ from django.test import TestCase, RequestFactory
 from django.utils.timezone import now
 from django.core.urlresolvers import reverse
 
-from .models import Ace, Hearts, Player
+from test_project.models import Ace, Hearts, Player
 from djangosaber.saber import Memory, Traverse, key
 
 class BaseSuite(TransactionTestCase):
@@ -36,8 +36,8 @@ class SaberTest(BaseSuite):
 
         memory = Memory(controllers=['test_project.controllers'])
         memory.initialize()
-        self.assertEquals(ace1.id, memory.data['ace'][0]['id'])
-        self.assertEquals(h1.id, memory.data['hearts'][0]['id'])
+        self.assertEquals(ace1.id, memory.data['ace'][0].id)
+        self.assertEquals(h1.id, memory.data['hearts'][0].id)
 
         self.assertEquals(Ace.objects.all().count(), len(memory.data['ace']))
         self.assertEquals(Hearts.objects.all().count(), len(memory.data['hearts']))
@@ -45,6 +45,8 @@ class SaberTest(BaseSuite):
         world = Traverse(memory.data)
         self.assertEquals(world.ace[0].beats_hearts(), Ace.objects.all().first().beats_hearts())
         self.assertTrue(False == world.player[0].winning() == Player.objects.all().first().winning())
+        
+        self.assertEquals(world.ace[0].pk, ace1.pk)
 
     def test_relation(self):
         player1,_ = Player.objects.get_or_create(name='Bob')
@@ -71,7 +73,7 @@ class SaberTest(BaseSuite):
         mem.create_indexes(exclude=exclude)
 
         db = Traverse(mem.data)
-        p = db.player[0]
+        p = filter(lambda x: getattr(x, 'id')==player1.pk, db.player)[0]
 
         self.assertEquals(key('player', str(p.id)), 'player.%s'%p.id)
         self.assertEquals([k.id for k in p.ace], [ace1.pk, ace2.pk])
@@ -82,7 +84,7 @@ class SaberTest(BaseSuite):
 
         # reverse FK
         from pprint import pprint as pp
-        self.assertTrue(isinstance(db.hearts[0].player, dict))
+        self.assertTrue(isinstance(db.hearts[0].player, object))
         self.assertEquals(db.hearts[0].player.id, player2.pk)
 
         self.assertEquals(db.ace[0].pla_yer.id, player1.id)

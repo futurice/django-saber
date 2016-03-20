@@ -12,15 +12,43 @@ import django
 APP = 'djangosaber'
 TEST_APP = 'test_project'
 
+TEMPLATES = [
+    {
+        'BACKEND': 'django.template.backends.django.DjangoTemplates',
+        'DIRS': [
+            os.path.join(os.path.dirname(__file__), "templates"),
+        ],
+        'OPTIONS': {
+            'context_processors': [
+                'django.contrib.auth.context_processors.auth',
+                'django.template.context_processors.debug',
+                'django.template.context_processors.i18n',
+                'django.template.context_processors.media',
+                'django.template.context_processors.static',
+                'django.template.context_processors.tz',
+                'django.contrib.messages.context_processors.messages',
+            ],
+            'loaders': [
+                'django.template.loaders.filesystem.Loader',
+                'django.template.loaders.app_directories.Loader',
+            ]
+        },
+    },
+]
+
 def main():
     parser = OptionParser()
     parser.add_option("--DATABASE_ENGINE", dest="DATABASE_ENGINE", default="sqlite3")
-    parser.add_option("--DATABASE_NAME", dest="DATABASE_NAME", default="")
+    parser.add_option("--DATABASE_NAME", dest="DATABASE_NAME", default="sqlite.db")
     parser.add_option("--DATABASE_USER", dest="DATABASE_USER", default="")
     parser.add_option("--DATABASE_PASSWORD", dest="DATABASE_PASSWORD", default="")
     parser.add_option("--SITE_ID", dest="SITE_ID", type="int", default=1)
     parser.add_option("--cmd", dest="cmd", default="test")
+    parser.add_option("--cmdargs", dest="cmdargs", default="")
     options, args = parser.parse_args()
+
+    if options.cmdargs:
+        args += options.cmdargs.split(',')
     
     try:
         app_path = args[0]
@@ -41,18 +69,20 @@ def main():
                 "PASSWORD": options.DATABASE_PASSWORD,
             }
         },
+        "DEBUG": True,
+        "ALLOWED_HOSTS": ['*'],
         "USE_TZ": True,
         "SITE_ID": options.SITE_ID,
-        "ROOT_URLCONF": "{0}.urls".format(APP),
-        "TEMPLATE_DIRS": (
-            os.path.join(os.path.dirname(__file__), "templates"),
-        ),
+        "ROOT_URLCONF": "{0}.urls".format(TEST_APP),
+        "TEMPLATES": TEMPLATES,
         "INSTALLED_APPS": (
             "django.contrib.admin",
             "django.contrib.auth",
             "django.contrib.contenttypes",
             "django.contrib.sessions",
             "django.contrib.sites",
+
+            "django_extensions",
 
             APP,
             TEST_APP,

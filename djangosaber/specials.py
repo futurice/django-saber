@@ -7,13 +7,8 @@ from cachetools import cachedmethod
 class TraverseCached(Traverse, DictCachedMixin):
     @cachedmethod(operator.attrgetter('_cache'))
     def lookup(self, key, rel_id, id):
-        return list(filter(pred(rel_id, id), self._memory.data[key]))
+        return super(TraverseCached, self).lookup(key, rel_id, id)
 
 class DictTraverse(Traverse):
     def __getitem__(self, key):
-        try:
-            return dict.__getitem__(self, key)
-        except KeyError:
-            if '%s_id'%key in self:
-                return self.get_relation(key)
-            raise
+        return dict.__getitem__(self, key)
