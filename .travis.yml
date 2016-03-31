@@ -12,5 +12,4 @@ notifications:
     - jussi.vaihia@futurice.com
 install:
   - pip install Django==$DJANGO --use-mirrors
-  - pip install six
-  - pip install cachetools
+  - pip install six cachetools django_extensions

@@ -34,6 +34,7 @@ setup(
     keywords = 'django model orm replacement inmemory performance fast calculations',
     license = 'BSD',
     install_requires = install_requires,
+    tests_require = ['django_extensions',],
     cmdclass = {
         'test': TestCommand,
     },
