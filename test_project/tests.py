@@ -73,7 +73,7 @@ class SaberTest(BaseSuite):
         mem.create_indexes(exclude=exclude)
 
         db = Traverse(mem.data)
-        p = filter(lambda x: getattr(x, 'id')==player1.pk, db.player)[0]
+        p = list(filter(lambda x: getattr(x, 'id')==player1.pk, db.player))[0]
 
         self.assertEquals(key('player', str(p.id)), 'player.%s'%p.id)
         self.assertEquals([k.id for k in p.ace], [ace1.pk, ace2.pk])
