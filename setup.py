@@ -17,7 +17,8 @@ class TestCommand(Command):
         raise SystemExit(
             subprocess.call([sys.executable,
                              'app_test_runner.py',
-                             'test_project']))
+                             'test_project',
+                             'test_project',]))
 
 install_requires = ['cachetools>=1.1.3']
 base_dir = os.path.dirname(os.path.abspath(__file__))

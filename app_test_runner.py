@@ -90,7 +90,7 @@ def main():
         "MIDDLEWARE_CLASSES": (),
     })
 
-    if django.get_version() >= '1.7':
+    if django.VERSION[:2] >= (1, 7):
         django.setup()
 
     call_command(options.cmd, *args[1:])

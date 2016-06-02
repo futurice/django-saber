@@ -21,6 +21,9 @@ def rel_id(model):
 def fk(self, a, pk, to):
     return Iterse(self.lookup(rel_id, key, my_id))
 
+def get_fields_with_model(model):
+    return [(f, f.model if f.model != model else None) for f in model._meta.get_fields()]
+
 class Memory(object):
     def __init__(self, controllers=[]):
         self._controllers = controllers
@@ -118,7 +121,7 @@ class Memory(object):
             rel = lambda k: k[0].related_model._meta.model_name if k[0].related_model else None
             rel_id = lambda k: k[0].field.attname if hasattr(k[0], 'field') else None
             name = lambda k: k[0].name
-            r[model._meta.model_name] = {name(k):{'tbl':rel(k),'rel_id': rel_id(k)} for k in model._meta.get_fields_with_model()}
+            r[model._meta.model_name] = {name(k):{'tbl':rel(k),'rel_id': rel_id(k)} for k in get_fields_with_model(model)}
         return r
 
     def model_rels(self):
@@ -131,7 +134,7 @@ class Memory(object):
         r = {}
         for model in apps.get_models():
             r.setdefault(model._meta.model_name, {})
-            for k in model._meta.get_fields_with_model():
+            for k in get_fields_with_model(model):
                 if rel(k[0]) or rel_id(k[0]):
                     r[model._meta.model_name][k[0].name] = {'tbl':rel(k[0]),'rel_id': rel_id(k[0])}
         return r
