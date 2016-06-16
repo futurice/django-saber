@@ -55,15 +55,11 @@ class Traverse(OrmMixin, object):
         if not self._memory.is_indexed:
             return [k for k in self._memory.data[key] if getattr(k, rel_id) == id]
         else:
-            # this is messed up... changes depending on what is looked up
-            key_lookup = key
-            if rel_id in ['id', 'pk']:
-                key_lookup = None
-            return self.index_lookup(index_key or key, id, key_lookup)
+            return self.index_lookup(index_key or key, id, key, rel_id=rel_id)
 
-    def index_lookup(self, tbl, id, rel_key):
+    def index_lookup(self, tbl, id, rel_key, rel_id=''):
         #logging.debug("index.lookup: %s, %s, %s"%(tbl,id,rel_key))
-        if rel_key is None:
+        if rel_key is None or rel_id in ['id', 'pk']:
             return self._memory.index.get(key(tbl, str(id)))
         return Iterse(self._memory.index.get(key(tbl, str(id), rel_key), []))
 
